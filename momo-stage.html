@@ -1,0 +1,151 @@
+<!doctype html>
+<!-- Three.js
+The MIT License
+
+Copyright © 2010-2026 three.js authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+-->
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#13292d"><title>断桥中继 · 峡谷回声</title><link rel="stylesheet" href="./momo.css"><script defer src="./momo-scenery.js"></script><script defer src="./momo-challenge.js"></script><script type="module" src="./momo-runtime.mjs"></script></head><body>
+<main class="momo-shell">
+  <div class="worksite"><div id="stage" class="stage">
+          <div class="sky-moon" aria-hidden="true"></div>
+          <div id="stage-render" class="stage-render" role="img" aria-label="MOMO 在峡谷维修栈桥上试跳的三维画面"></div>
+          <div id="landing-targets" role="group" aria-label="现场候选落点"></div>
+          <header class="stage-header">
+            <div>
+              <h2 id="stage-title">MOMO 遥测</h2>
+              <span class="stage-pose" id="stage-pose"></span>
+            </div>
+            <div class="camera-switch" role="group" aria-label="镜头视角">
+              <button type="button" data-camera="follow" aria-pressed="true" title="可拖动画面调整角度">跟随</button>
+              <button type="button" data-camera="overview" aria-pressed="false">全景</button>
+            </div>
+          </header>
+          <div class="stage-hud">
+            <div class="stage-event"><span id="status-dot" class="status-dot"></span><span id="stage-status" role="status">等待探索</span></div>
+            <span id="stage-reward" class="stage-reward" hidden></span>
+          </div>
+          <div class="progress-track" aria-hidden="true"><div id="stage-progress"></div></div>
+        </div>
+        
+    <button type="button" id="monitor-toggle" aria-expanded="false" aria-controls="monitor">传感器副屏</button>
+    <aside id="monitor"><section class="sensor-card" aria-labelledby="sensor-title">
+        <header class="sensor-header">
+          <div><div class="sensor-eyebrow"><span></span> MOMO / SENSOR FEED</div><h2 id="sensor-title">机器人视角</h2></div>
+          <label class="switch-control"><input id="depth-on" type="checkbox" role="switch" checked /><span class="switch-track" aria-hidden="true"></span><span id="depth-switch-label">接入 ToF</span></label>
+        </header>
+        <div id="sensor-tabs" class="sensor-tabs" role="group" aria-label="副屏视图">
+          <button type="button" data-sensor="radar" aria-pressed="false">雷达</button>
+          <button type="button" data-sensor="depth" aria-pressed="true">ToF</button>
+          <button type="button" data-sensor="map" aria-pressed="false">建图</button>
+          <button type="button" data-sensor="histogram" aria-pressed="false">直方图</button>
+          <button type="button" data-sensor="kalman" aria-pressed="false">卡尔曼</button>
+        </div>
+        <div class="sensor-window" id="sensor-window">
+          <div class="sensor-window-meta"><span id="feed-name">ToF / 局部点云</span><span id="feed-time">00.00 s</span></div>
+          <canvas id="sensor-canvas" role="img" aria-describedby="sensor-readout"></canvas>
+          <div id="depth-empty" class="depth-empty" hidden><span aria-hidden="true">◌</span><strong>ToF 未接入</strong><small>打开上方开关，查看深度和点云。</small></div>
+          <div id="sensor-legend" class="sensor-legend"></div>
+        </div>
+        <div class="sensor-footer">
+          <p id="sensor-readout"></p>
+          <div id="radar-options" class="sensor-options" hidden>
+            <label for="radar-beams">射线数</label>
+            <select id="radar-beams"><option value="24">24</option><option value="56" selected>56</option><option value="96">96</option></select>
+          </div>
+          <div id="depth-options" class="sensor-options">
+            <label for="depth-view">视图</label>
+            <select id="depth-view"><option value="depth">深度图</option><option value="cloud" selected>3D 点云</option></select>
+          </div>
+          <div id="histogram-options" class="sensor-options localization-options" hidden>
+            <label for="histogram-view">概率层</label>
+            <select id="histogram-view"><option value="posterior">后验</option><option value="likelihood">测距似然</option><option value="prediction">运动预测</option></select>
+            <div class="beacon-options" role="group" aria-label="参与测距的信标">
+              <label><input type="checkbox" data-beacon="0" checked /> A</label>
+              <label><input type="checkbox" data-beacon="1" checked /> B</label>
+              <label><input type="checkbox" data-beacon="2" checked /> C</label>
+            </div>
+          </div>
+          <div id="kalman-options" class="sensor-options" hidden>
+            <label for="measurement-noise">测量噪声 σ</label>
+            <select id="measurement-noise"><option value="0.35">0.35 m</option><option value="0.95" selected>0.95 m</option><option value="1.8">1.80 m</option></select>
+          </div>
+        </div>
+      </section></aside>
+  </div>
+  <section class="pilot">
+    <div class="pilot-task"><small id="phase-title">工程调度</small><h1 id="mission-goal">断桥中继</h1><p id="pilot-hint" role="status"></p></div>
+    <div class="pilot-actions"><button class="primary" id="mission-action">接入现场</button><div id="jump-command" hidden><label for="pilot-jump">试跳动作</label> <select id="pilot-jump"></select> <button id="send-jump">发出单跳</button></div></div>
+    <div class="pilot-secondary"><button id="open-training" hidden>策略训练</button><span id="comparison-note"></span></div>
+    <div class="stage-controls">
+          <button id="play" type="button" class="play"><span id="play-icon" aria-hidden="true">▶</span><span id="play-label">开始探索</span></button>
+          <button id="step" type="button" class="quiet"><span aria-hidden="true">▷|</span> 单步</button>
+          <button id="restart" type="button" class="quiet"><span aria-hidden="true">↺</span> 重开对照</button>
+          <label class="obstacle-control"><input type="checkbox" id="bridge-cut" checked /> 断桥</label>
+          <label class="speed" for="speed">速度
+            <select id="speed">
+              <option value="0.5">0.5×</option>
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+        </div>
+      
+  </section>
+  <section class="lab-drawer" id="training-drawer" role="dialog" aria-label="策略训练" hidden><div class="drawer-head"><h2>策略训练</h2><button id="close-training">返回现场</button></div><div class="bottom-grid">
+      <section class="training-card" aria-labelledby="training-title">
+        <header class="training-heading">
+          <div><h2 id="training-title">训练曲线</h2><p id="chart-source">桥接通时预训练 · 220 回合</p></div>
+          <div class="segment" role="group" aria-label="曲线指标">
+            <button type="button" data-chart="reward" aria-pressed="true">回合奖励</button>
+            <button type="button" data-chart="success" aria-pressed="false">通关率</button>
+          </div>
+        </header>
+        <div class="training-metrics">
+          <div><span>当前训练回合</span><strong id="metric-episodes">0</strong></div>
+          <div><span>近 20 局平均奖励</span><strong id="metric-average">—</strong></div>
+          <div><span>近 20 局通关率</span><strong id="metric-rate">—</strong></div>
+        </div>
+        <div class="chart-wrap"><canvas id="training-chart" role="img" aria-label="按回合绘制的真实训练数据"></canvas></div>
+        <div id="chart-key" class="chart-key"><span><i></i>20 局滑动平均</span><span><i></i>单局奖励</span></div>
+      </section>
+
+      <section class="tuning-card" aria-labelledby="tuning-title">
+        <header class="tuning-heading"><h2 id="tuning-title">策略与奖惩</h2><span>Q-LEARNING</span></header>
+        <label class="reward-control" for="reward">奖励函数<select id="reward"><option value="balanced">均衡</option><option value="safe">避险优先</option><option value="short">少走步数</option></select></label>
+        <div id="reward-details" class="reward-details"></div>
+        <label class="slider-row" for="alpha"><span>学习率 <b>α</b></span><output for="alpha" id="alpha-value">0.32</output><input type="range" id="alpha" min="0.05" max="0.95" step="0.01" value="0.32" /></label>
+        <label class="slider-row" for="gamma"><span>折扣因子 <b>γ</b></span><output for="gamma" id="gamma-value">0.985</output><input type="range" id="gamma" min="0.70" max="0.995" step="0.005" value="0.985" /></label>
+        <label class="slider-row" for="epsilon"><span>探索率 <b>ε</b></span><output for="epsilon" id="epsilon-value">0.14</output><input type="range" id="epsilon" min="0" max="0.6" step="0.01" value="0.14" /></label>
+        <div class="tuning-actions">
+          <label for="train-episodes">回合数</label>
+          <select id="train-episodes"><option value="100">100</option><option value="1000" selected>1,000</option><option value="10000">10,000</option></select>
+          <button type="button" id="train">快进训练</button>
+          <button type="button" id="clear" class="quiet">清空策略</button>
+        </div>
+        <progress id="train-progress" class="train-progress" aria-label="快进训练进度" hidden></progress>
+        <p id="tuning-status" class="tuning-status" role="status">可清空策略，从零开始探索。</p>
+      </section>
+    </div>
+    </section>
+  <div id="radio-intro" class="radio-intro"><div><small>工程队电台　/　MOMO</small><h2>断桥中继</h2><p>地震扯断了中继站的维修栈桥。MOMO 还记得桥完好时的路线。先看它怎样走错，再接入深度传感器，送它到对岸。</p><button id="accept-task" class="primary">接管 MOMO</button></div></div>
+</main></body></html>
